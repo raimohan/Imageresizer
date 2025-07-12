@@ -15,6 +15,10 @@ export default function ImageResizer() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const { toast } = useToast();
 
+  const activeImage = useMemo(() => {
+    return activeIndex !== null ? images[activeIndex] : null;
+  }, [images, activeIndex]);
+
   const handleFilesAdded = useCallback((files: File[]) => {
     const newImages: ImageFile[] = [];
     const promises = Array.from(files).map(file => {
@@ -139,10 +143,6 @@ export default function ImageResizer() {
           downloadImage(activeImage.resizedUrl, activeImage.file.name, activeImage.settings.format);
       }
   }, [activeImage, toast]);
-
-  const activeImage = useMemo(() => {
-    return activeIndex !== null ? images[activeIndex] : null;
-  }, [images, activeIndex]);
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
