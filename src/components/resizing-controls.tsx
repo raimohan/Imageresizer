@@ -86,7 +86,7 @@ export default function ResizingControls({ image, onSettingsChange, onResize, on
                     <Input 
                       id="targetSize"
                       type="number"
-                      value={settings?.targetSize || Math.round((image?.file?.size || 0) / 1024)} 
+                      value={settings?.targetSize || ''} 
                       onChange={e => handleSettings('targetSize', parseInt(e.target.value, 10) || 0)}
                       className="w-full"
                     />
