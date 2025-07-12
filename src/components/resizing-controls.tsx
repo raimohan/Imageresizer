@@ -1,59 +1,40 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import type { ImageFile } from '@/types';
-import { useDebounce } from '@/hooks/use-debounce';
-import { estimateFileSize } from '@/ai/flows/estimate-file-size';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Crop, RotateCw, Lock, Unlock, Download } from 'lucide-react';
-import { Skeleton } from './ui/skeleton';
+import { Lock, Unlock, Download, RefreshCw } from 'lucide-react';
 
 interface ResizingControlsProps {
   image: ImageFile | null;
   onSettingsChange: (settings: Partial<ImageFile['settings']>) => void;
-  onEstimationUpdate: (size: number | null, isEstimating: boolean) => void;
+  onResize: (image: ImageFile) => void;
+  onDownload: () => void;
 }
 
-export default function ResizingControls({ image, onSettingsChange, onEstimationUpdate }: ResizingControlsProps) {
+export default function ResizingControls({ image, onSettingsChange, onResize, onDownload }: ResizingControlsProps) {
   const settings = image?.settings;
-  const debouncedSettings = useDebounce(settings, 500);
-
-  useEffect(() => {
-    if (!debouncedSettings || !image) {
-      return;
-    }
-
-    const runEstimation = async () => {
-      onEstimationUpdate(null, true);
-      try {
-        const result = await estimateFileSize({
-          originalWidth: image.originalWidth,
-          originalHeight: image.originalHeight,
-          percentage: debouncedSettings.percentage,
-          targetFileSizeKB: debouncedSettings.targetSize,
-          format: debouncedSettings.format,
-          quality: debouncedSettings.quality,
-        });
-        onEstimationUpdate(result.estimatedFileSizeKB, false);
-      } catch (error) {
-        console.error("Estimation failed:", error);
-        onEstimationUpdate(null, false);
-      }
-    };
-    runEstimation();
-  }, [debouncedSettings, image, onEstimationUpdate]);
-
+  const isDisabled = !image;
 
   const handleSettings = (key: keyof ImageFile['settings'], value: any) => {
     onSettingsChange({ [key]: value });
   };
   
-  const isDisabled = !image;
+  const handleResizeClick = () => {
+    if (image) {
+      onResize(image);
+    }
+  }
+
+  const handleDownloadClick = () => {
+    if (image) {
+      onDownload();
+    }
+  }
 
   return (
     <Card className="h-full shadow-sm">
@@ -86,16 +67,6 @@ export default function ResizingControls({ image, onSettingsChange, onEstimation
             <Slider value={[settings?.percentage || 100]} min={10} max={200} step={1} onValueChange={([val]) => handleSettings('percentage', val)} />
           </div>
           
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <Label>Target File Size</Label>
-               {image?.isEstimating ? <Skeleton className="w-20 h-5" /> : (
-                <span className="text-sm font-medium text-primary">{image?.estimatedSize ? `~${image.estimatedSize.toFixed(1)} KB` : 'N/A'}</span>
-              )}
-            </div>
-            <Slider value={[settings?.targetSize || 250]} min={10} max={500} step={10} onValueChange={([val]) => handleSettings('targetSize', val)} />
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="format">Format</Label>
@@ -118,15 +89,15 @@ export default function ResizingControls({ image, onSettingsChange, onEstimation
               <Slider value={[(settings?.quality || 0.8) * 100]} onValueChange={([val]) => handleSettings('quality', val / 100)} />
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-muted-foreground">Optional Tools:</p>
-            <Button variant="outline" size="icon" className="transition-transform hover:scale-105"><RotateCw/></Button>
-            <Button variant="outline" size="icon" className="transition-transform hover:scale-105"><Crop/></Button>
-          </div>
         </fieldset>
         
-        <Button size="lg" className="w-full text-lg transition-transform hover:scale-105" disabled={isDisabled}>
+        <div className="flex gap-2">
+            <Button size="lg" className="w-full text-lg transition-transform hover:scale-105" disabled={isDisabled || image?.isResizing} onClick={handleResizeClick}>
+                <RefreshCw className={`mr-2 ${image?.isResizing ? 'animate-spin' : ''}`} />
+                {image?.isResizing ? 'Resizing...' : 'Preview Changes'}
+            </Button>
+        </div>
+        <Button size="lg" className="w-full text-lg transition-transform hover:scale-105" disabled={isDisabled} onClick={handleDownloadClick}>
           <Download className="mr-2" />
           Resize & Download
         </Button>

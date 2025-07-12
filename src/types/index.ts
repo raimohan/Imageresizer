@@ -9,10 +9,10 @@ export type ImageFile = {
     height: number;
     isLocked: boolean;
     percentage: number;
-    targetSize: number;
     format: 'JPEG' | 'PNG' | 'WebP';
     quality: number;
   };
-  estimatedSize: number | null;
-  isEstimating: boolean;
+  resizedUrl: string | null;
+  resizedSize: number | null;
+  isResizing: boolean;
 };

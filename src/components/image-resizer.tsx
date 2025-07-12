@@ -7,10 +7,13 @@ import ResizingControls from '@/components/resizing-controls';
 import ImageQueue from '@/components/image-queue';
 import { Button } from '@/components/ui/button';
 import { Shrink, Download, Archive } from 'lucide-react';
+import { resizeImage, downloadImage } from '@/lib/image-utils';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ImageResizer() {
   const [images, setImages] = useState<ImageFile[]>([]);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const { toast } = useToast();
 
   const handleFilesAdded = useCallback((files: File[]) => {
     const newImages: ImageFile[] = [];
@@ -31,12 +34,12 @@ export default function ImageResizer() {
                 height: img.height,
                 isLocked: true,
                 percentage: 100,
-                targetSize: 250,
                 format: 'JPEG',
                 quality: 0.8,
               },
-              estimatedSize: null,
-              isEstimating: false,
+              resizedUrl: null,
+              resizedSize: null,
+              isResizing: false
             };
             newImages.push(newImage);
             resolve();
@@ -89,22 +92,53 @@ export default function ImageResizer() {
       
       updatedImages[activeIndex] = {
         ...activeImage,
-        settings: mergedSettings
+        settings: mergedSettings,
+        resizedUrl: null,
+        resizedSize: null,
       };
 
       return updatedImages;
     });
   }, [activeIndex]);
   
-  const handleEstimationUpdate = useCallback((size: number | null, isEstimating: boolean) => {
-     if (activeIndex === null) return;
-      setImages(prev => {
-        const updated = [...prev];
-        updated[activeIndex] = { ...updated[activeIndex], estimatedSize: size, isEstimating };
-        return updated;
-      });
-  }, [activeIndex]);
+  const handleResize = useCallback(async (imageToResize: ImageFile) => {
+    if (!imageToResize) return;
+    
+    setImages(prev => prev.map(img => img.id === imageToResize.id ? { ...img, isResizing: true } : img));
 
+    try {
+        const { url, size } = await resizeImage(imageToResize);
+        setImages(prev => prev.map(img => img.id === imageToResize.id ? { ...img, resizedUrl: url, resizedSize: size, isResizing: false } : img));
+    } catch (error) {
+        console.error("Resizing failed:", error);
+        setImages(prev => prev.map(img => img.id === imageToResize.id ? { ...img, isResizing: false } : img));
+        toast({
+          variant: "destructive",
+          title: "Resize Failed",
+          description: "There was an error while resizing the image.",
+        });
+    }
+  }, [toast]);
+  
+  const handleDownload = useCallback(async () => {
+      if (!activeImage) return;
+      if (!activeImage.resizedUrl) {
+          try {
+              const { url, size } = await resizeImage(activeImage);
+              setImages(prev => prev.map(img => img.id === activeImage.id ? { ...img, resizedUrl: url, resizedSize: size, isResizing: false } : img));
+              downloadImage(url, activeImage.file.name, activeImage.settings.format);
+          } catch (error) {
+              console.error("Resizing for download failed:", error);
+              toast({
+                  variant: "destructive",
+                  title: "Resize Failed",
+                  description: "Could not resize image for download.",
+              });
+          }
+      } else {
+          downloadImage(activeImage.resizedUrl, activeImage.file.name, activeImage.settings.format);
+      }
+  }, [activeImage, toast]);
 
   const activeImage = useMemo(() => {
     return activeIndex !== null ? images[activeIndex] : null;
@@ -130,7 +164,8 @@ export default function ImageResizer() {
             <ResizingControls 
               image={activeImage} 
               onSettingsChange={handleSettingsChange}
-              onEstimationUpdate={handleEstimationUpdate}
+              onResize={handleResize}
+              onDownload={handleDownload}
             />
           </div>
           <div className="hidden lg:block">
