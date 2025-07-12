@@ -1,16 +1,14 @@
 'use client';
 
-import { useCallback } from 'react';
 import type { ImageFile } from '@/types';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { UploadCloud, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { Skeleton } from './ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
 
 interface ImagePreviewProps {
   activeImage: ImageFile | null;
-  onFilesAdded: (files: File[]) => void;
 }
 
 const formatBytes = (bytes: number, decimals = 2) => {
@@ -23,99 +21,74 @@ const formatBytes = (bytes: number, decimals = 2) => {
 }
 
 
-export default function ImagePreview({ activeImage, onFilesAdded }: ImagePreviewProps) {
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files) {
-      onFilesAdded(Array.from(event.target.files));
-    }
-  };
-
-  const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
-      onFilesAdded(Array.from(event.dataTransfer.files));
-      event.dataTransfer.clearData();
-    }
-  }, [onFilesAdded]);
-
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-  };
+export default function ImagePreview({ activeImage }: ImagePreviewProps) {
+  if (!activeImage) {
+    return null;
+  }
   
+  const hasResized = activeImage.resizedUrl && activeImage.resizedSize;
+
   return (
-    <Card className="h-full shadow-sm">
-      <CardContent className="h-full p-4">
-        {activeImage ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
-            <div className="flex flex-col">
-              <h3 className="text-center font-semibold mb-2">Before</h3>
-              <div className="relative w-full flex-grow flex items-center justify-center bg-muted/30 rounded-md overflow-hidden">
-                <Image
-                  key={`${activeImage.id}-before`}
-                  src={activeImage.previewUrl}
-                  alt="Original image preview"
-                  fill
-                  style={{ objectFit: 'contain' }}
-                  className="animate-in fade-in duration-500"
-                  unoptimized
-                />
-                <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 text-xs rounded-md">
-                  {activeImage.originalWidth} x {activeImage.originalHeight} px &bull; {formatBytes(activeImage.file.size)}
-                </div>
-              </div>
+    <div className='flex flex-col'>
+      <h3 className="text-[#121217] text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Preview</h3>
+      <Tabs defaultValue="before" className="w-full">
+        <div className="pb-3">
+            <div className="flex border-b px-4 gap-8">
+                <TabsList className='p-0 bg-transparent gap-8'>
+                    <TabsTrigger value="before" className='flex flex-col items-center justify-center border-b-[3px] border-b-transparent data-[state=active]:border-b-[#121217] text-[#656a86] data-[state=active]:text-[#121217] pb-[13px] pt-4 rounded-none'>
+                        <p className="text-sm font-bold leading-normal tracking-[0.015em]">Before</p>
+                    </TabsTrigger>
+                    <TabsTrigger value="after" className='flex flex-col items-center justify-center border-b-[3px] border-b-transparent data-[state=active]:border-b-[#121217] text-[#656a86] data-[state=active]:text-[#121217] pb-[13px] pt-4 rounded-none' disabled={!hasResized}>
+                        <p className="text-sm font-bold leading-normal tracking-[0.015em]">After</p>
+                    </TabsTrigger>
+                </TabsList>
             </div>
-             <div className="flex flex-col">
-              <h3 className="text-center font-semibold mb-2">After</h3>
-              <div className="relative w-full flex-grow flex items-center justify-center bg-muted/30 rounded-md overflow-hidden">
-                 {activeImage.isResizing ? (
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Loader2 className="w-8 h-8 animate-spin" />
-                    <p>Resizing...</p>
-                  </div>
-                ) : activeImage.resizedUrl ? (
-                  <>
-                    <Image
-                      key={`${activeImage.id}-after`}
-                      src={activeImage.resizedUrl}
-                      alt="Resized image preview"
-                      fill
-                      style={{ objectFit: 'contain' }}
-                      className="animate-in fade-in duration-500"
-                      unoptimized
-                    />
-                    <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 text-xs rounded-md">
-                        {activeImage.settings.width} x {activeImage.settings.height} px &bull; {activeImage.resizedSize ? formatBytes(activeImage.resizedSize) : ''}
+        </div>
+
+        <div className="w-full grow bg-white p-4">
+            <div className="relative w-full gap-1 overflow-hidden bg-white aspect-[3/2] rounded-xl flex items-center justify-center">
+                <TabsContent value="before" className='w-full h-full m-0'>
+                    <div className="relative w-full h-full aspect-auto rounded-none flex-1">
+                        <Image
+                            src={activeImage.previewUrl}
+                            alt="Original image preview"
+                            fill
+                            style={{ objectFit: 'contain' }}
+                            unoptimized
+                        />
                     </div>
-                  </>
-                ) : (
-                  <div className="text-center text-muted-foreground p-4">
-                    <p>Your resized image will appear here after you click "Preview Changes".</p>
-                  </div>
-                )}
-              </div>
+                </TabsContent>
+                <TabsContent value="after" className='w-full h-full m-0'>
+                   {activeImage.isResizing ? (
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <Loader2 className="w-8 h-8 animate-spin" />
+                        <p>Resizing...</p>
+                      </div>
+                    ) : activeImage.resizedUrl ? (
+                        <div className="relative w-full h-full aspect-auto rounded-none flex-1">
+                            <Image
+                                src={activeImage.resizedUrl}
+                                alt="Resized image preview"
+                                fill
+                                style={{ objectFit: 'contain' }}
+                                unoptimized
+                            />
+                        </div>
+                    ) : (
+                      <div className="text-center text-muted-foreground p-4">
+                        <p>Your resized image will appear here.</p>
+                      </div>
+                    )}
+                </TabsContent>
             </div>
-          </div>
-        ) : (
-          <div 
-            className="h-full border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center text-center p-6"
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-          >
-            <UploadCloud className="w-16 h-16 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-semibold">Drag & drop images here</h3>
-            <p className="text-muted-foreground mb-4">or</p>
-            <Button asChild className="transition-transform hover:scale-105">
-              <label htmlFor="file-upload">
-                Browse Files
-                <input id="file-upload" type="file" className="sr-only" multiple accept="image/*" onChange={handleFileChange} />
-              </label>
-            </Button>
-            <p className="text-xs text-muted-foreground mt-4">Supports JPEG, PNG, WebP</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      </Tabs>
+
+      <p className="text-[#656a86] text-sm font-normal leading-normal pb-3 pt-1 px-4 text-center">
+        Dimensions: {hasResized ? `${activeImage.settings.width} x ${activeImage.settings.height}` : `${activeImage.originalWidth} x ${activeImage.originalHeight}`} px 
+        | Size: {hasResized ? formatBytes(activeImage.resizedSize ?? 0) : formatBytes(activeImage.file.size)}
+      </p>
+
+    </div>
   );
 }

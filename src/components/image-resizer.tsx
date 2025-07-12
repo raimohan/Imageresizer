@@ -6,9 +6,63 @@ import ImagePreview from '@/components/image-preview';
 import ResizingControls from '@/components/resizing-controls';
 import ImageQueue from '@/components/image-queue';
 import { Button } from '@/components/ui/button';
-import { Shrink, Download, Archive } from 'lucide-react';
 import { resizeImage, downloadImage } from '@/lib/image-utils';
 import { useToast } from '@/hooks/use-toast';
+import { Sun, UploadCloud } from 'lucide-react';
+
+const AppHeader = () => (
+    <header className="flex items-center justify-between whitespace-nowrap border-b px-10 py-3">
+        <div className="flex items-center gap-4 text-[#121217]">
+            <div className="size-4">
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path></svg>
+            </div>
+            <h2 className="text-[#121217] text-lg font-bold leading-tight tracking-[-0.015em]">Image Resizer</h2>
+        </div>
+        <button
+            className="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 bg-[#f0f1f4] text-[#121217] gap-2 text-sm font-bold leading-normal tracking-[0.015em] min-w-0 px-2.5"
+        >
+            <Sun size={20} />
+        </button>
+    </header>
+);
+
+const UploadArea = ({ onFilesAdded }: { onFilesAdded: (files: File[]) => void }) => {
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files) {
+            onFilesAdded(Array.from(event.target.files));
+        }
+    };
+
+    const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+            onFilesAdded(Array.from(event.dataTransfer.files));
+            event.dataTransfer.clearData();
+        }
+    }, [onFilesAdded]);
+
+    const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+    };
+
+    return (
+        <div className="flex flex-col items-center" onDrop={handleDrop} onDragOver={handleDragOver}>
+            <h2 className="text-[#121217] tracking-light text-[28px] font-bold leading-tight px-4 text-center pb-3 pt-5">Resize your images</h2>
+            <p className="text-[#121217] text-base font-normal leading-normal pb-3 pt-1 px-4 text-center">Drag and drop your images here, or</p>
+            <div className="flex px-4 py-3 justify-center">
+                <Button asChild variant="secondary" className='rounded-full h-10 px-4 text-sm font-bold'>
+                    <label htmlFor="file-upload" className='cursor-pointer'>
+                        Upload
+                        <input id="file-upload" type="file" className="sr-only" multiple accept="image/*" onChange={handleFileChange} />
+                    </label>
+                </Button>
+            </div>
+        </div>
+    );
+};
+
 
 export default function ImageResizer() {
   const [images, setImages] = useState<ImageFile[]>([]);
@@ -170,66 +224,32 @@ export default function ImageResizer() {
   }, [activeImage, toast]);
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-4rem)]">
-      <header className="flex items-center gap-2 mb-8">
-        <Shrink className="w-8 h-8 text-primary" />
-        <h1 className="text-3xl font-bold font-headline">Shrinkray</h1>
-        <span className="text-3xl font-light text-muted-foreground">Image Resizer</span>
-      </header>
-      
-      <main className="flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-5 xl:col-span-6">
-          <ImagePreview 
-            activeImage={activeImage} 
-            onFilesAdded={handleFilesAdded}
-          />
+    <div className="flex flex-col h-full min-h-screen">
+      <AppHeader />
+        <div className="gap-1 px-6 flex flex-1 justify-center py-5">
+            <main className="layout-content-container flex flex-col max-w-[920px] flex-1">
+                {!activeImage ? (
+                    <UploadArea onFilesAdded={handleFilesAdded} />
+                ) : (
+                    <>
+                        <ImagePreview activeImage={activeImage} />
+                        <ResizingControls 
+                            image={activeImage} 
+                            onSettingsChange={handleSettingsChange}
+                            onResize={() => handleResize(activeImage)}
+                            onDownload={handleDownload}
+                        />
+                    </>
+                )}
+            </main>
+            <aside>
+                <ImageQueue 
+                    images={images}
+                    activeIndex={activeIndex}
+                    onSelectImage={handleSelectImage}
+                />
+            </aside>
         </div>
-        <div className="lg:col-span-7 xl:col-span-6 flex flex-col gap-6">
-          <div className="flex-grow">
-            <ResizingControls 
-              image={activeImage} 
-              onSettingsChange={handleSettingsChange}
-              onResize={() => activeImage && handleResize(activeImage)}
-              onDownload={handleDownload}
-            />
-          </div>
-          <div className="hidden lg:block">
-            <ImageQueue 
-              images={images}
-              activeIndex={activeIndex}
-              onSelectImage={handleSelectImage}
-            />
-          </div>
-        </div>
-      </main>
-
-      <div className="lg:hidden mt-6">
-        <ImageQueue 
-          images={images}
-          activeIndex={activeIndex}
-          onSelectImage={handleSelectImage}
-        />
-      </div>
-
-       <div className="mt-6">
-          <div className="bg-card p-4 rounded-lg shadow-sm border flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">Process multiple images and download them at once.</p>
-            <div className="flex items-center gap-2">
-               <Button variant="outline" className="transition-transform hover:scale-105" disabled={images.length < 2}>
-                <Download className="mr-2" />
-                Download All
-              </Button>
-              <Button className="transition-transform hover:scale-105" disabled={images.length < 2}>
-                <Archive className="mr-2" />
-                Download as ZIP
-              </Button>
-            </div>
-          </div>
-        </div>
-      
-      <footer className="text-center mt-8 text-sm text-muted-foreground">
-        <p>All processing happens offline in your browser. No image data is stored on our servers.</p>
-      </footer>
     </div>
   );
 }

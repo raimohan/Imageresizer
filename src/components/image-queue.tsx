@@ -1,8 +1,6 @@
 'use client';
 
 import type { ImageFile } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 
@@ -14,36 +12,23 @@ interface ImageQueueProps {
 
 export default function ImageQueue({ images, activeIndex, onSelectImage }: ImageQueueProps) {
   
-  const formatBytes = (bytes: number, decimals = 2) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-  }
-
   return (
-    <Card className="h-full shadow-sm">
-      <CardHeader>
-        <CardTitle>Queue ({images.length})</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-48">
-          <div className="space-y-2 pr-4">
+    <div className="flex flex-col w-[360px]">
+        <h3 className="text-[#121217] text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Queue ({images.length})</h3>
+        <div className='overflow-y-auto'>
             {images.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">Your uploaded images will appear here.</p>
+              <p className="text-sm text-muted-foreground text-center py-8 px-4">Your uploaded images will appear here.</p>
             )}
             {images.map((image, index) => (
               <button
                 key={image.id}
                 onClick={() => onSelectImage(index)}
                 className={cn(
-                  "flex items-center w-full p-2 rounded-md border text-left transition-colors",
-                  index === activeIndex ? "bg-primary/10 border-primary" : "hover:bg-muted"
+                  "flex items-center w-full gap-4 text-left p-4 min-h-[72px] transition-colors",
+                  index === activeIndex ? "bg-secondary" : "hover:bg-secondary/50"
                 )}
               >
-                <div className="w-16 h-16 relative rounded-md overflow-hidden bg-muted flex-shrink-0">
+                <div className="relative size-14 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                    <Image 
                     src={image.previewUrl} 
                     alt={image.file.name} 
@@ -52,16 +37,13 @@ export default function ImageQueue({ images, activeIndex, onSelectImage }: Image
                     unoptimized
                   />
                 </div>
-                <div className="ml-4 overflow-hidden">
-                  <p className="text-sm font-medium truncate">{image.file.name}</p>
-                  <p className="text-xs text-muted-foreground">{image.originalWidth}x{image.originalHeight} &bull; {image.file.type.split('/')[1]?.toUpperCase()}</p>
-                   <p className="text-xs text-muted-foreground">{formatBytes(image.file.size)}</p>
+                <div className="flex flex-col justify-center overflow-hidden">
+                  <p className="text-base font-medium truncate">{image.file.name}</p>
+                  <p className="text-sm text-muted-foreground">{image.originalWidth}x{image.originalHeight}, {image.file.type.split('/')[1]?.toUpperCase()}</p>
                 </div>
               </button>
             ))}
-          </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+        </div>
+    </div>
   );
 }
