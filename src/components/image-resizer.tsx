@@ -40,6 +40,7 @@ export default function ImageResizer() {
                 percentage: 100,
                 format: 'JPEG',
                 quality: 0.8,
+                targetSize: Math.round(file.size / 1024),
               },
               resizedUrl: null,
               resizedSize: null,
@@ -76,22 +77,34 @@ export default function ImageResizer() {
 
       const mergedSettings = { ...oldSettings, ...newSettings };
       
+      const aspectRatio = activeImage.originalWidth / activeImage.originalHeight;
+
       if(newSettings.width && oldSettings.width !== newSettings.width && mergedSettings.isLocked) {
-        mergedSettings.height = Math.round((newSettings.width / activeImage.originalWidth) * activeImage.originalHeight);
+        mergedSettings.height = Math.round(newSettings.width / aspectRatio);
       } else if (newSettings.height && oldSettings.height !== newSettings.height && mergedSettings.isLocked) {
-        mergedSettings.width = Math.round((newSettings.height / activeImage.originalHeight) * activeImage.originalWidth);
+        mergedSettings.width = Math.round(newSettings.height * aspectRatio);
       } else if(newSettings.percentage && oldSettings.percentage !== newSettings.percentage) {
         mergedSettings.width = Math.round(activeImage.originalWidth * (newSettings.percentage / 100));
         mergedSettings.height = Math.round(activeImage.originalHeight * (newSettings.percentage / 100));
       } else if (newSettings.isLocked !== undefined) {
          if (mergedSettings.isLocked) {
-           mergedSettings.height = Math.round((mergedSettings.width / activeImage.originalWidth) * activeImage.originalHeight);
+           mergedSettings.height = Math.round(mergedSettings.width / aspectRatio);
          }
       }
 
       if (mergedSettings.width !== oldSettings.width || mergedSettings.height !== oldSettings.height) {
         const percentage = Math.round((mergedSettings.width / activeImage.originalWidth) * 100);
-        mergedSettings.percentage = percentage;
+        mergedSettings.percentage = isNaN(percentage) ? 100 : percentage;
+      }
+
+      if (newSettings.targetSize && oldSettings.targetSize !== newSettings.targetSize) {
+        const originalSizeKB = activeImage.file.size / 1024;
+        const sizeRatio = Math.sqrt(newSettings.targetSize / originalSizeKB);
+        if (sizeRatio > 0 && sizeRatio < Infinity) {
+          mergedSettings.width = Math.round(activeImage.originalWidth * sizeRatio);
+          mergedSettings.height = Math.round(activeImage.originalHeight * sizeRatio);
+          mergedSettings.percentage = Math.round(sizeRatio * 100);
+        }
       }
       
       updatedImages[activeIndex] = {
@@ -112,7 +125,14 @@ export default function ImageResizer() {
 
     try {
         const { url, size } = await resizeImage(imageToResize);
-        setImages(prev => prev.map(img => img.id === imageToResize.id ? { ...img, resizedUrl: url, resizedSize: size, isResizing: false } : img));
+        setImages(prev => {
+            const newImages = [...prev];
+            const imageIndex = newImages.findIndex(img => img.id === imageToResize.id);
+            if (imageIndex > -1) {
+              newImages[imageIndex] = { ...newImages[imageIndex], resizedUrl: url, resizedSize: size, isResizing: false };
+            }
+            return newImages;
+        });
     } catch (error) {
         console.error("Resizing failed:", error);
         setImages(prev => prev.map(img => img.id === imageToResize.id ? { ...img, isResizing: false } : img));
@@ -126,11 +146,14 @@ export default function ImageResizer() {
   
   const handleDownload = useCallback(async () => {
       if (!activeImage) return;
-      if (!activeImage.resizedUrl) {
+      
+      let imageUrl = activeImage.resizedUrl;
+
+      if (!imageUrl) {
           try {
               const { url, size } = await resizeImage(activeImage);
               setImages(prev => prev.map(img => img.id === activeImage.id ? { ...img, resizedUrl: url, resizedSize: size, isResizing: false } : img));
-              downloadImage(url, activeImage.file.name, activeImage.settings.format);
+              imageUrl = url;
           } catch (error) {
               console.error("Resizing for download failed:", error);
               toast({
@@ -138,10 +161,12 @@ export default function ImageResizer() {
                   title: "Resize Failed",
                   description: "Could not resize image for download.",
               });
+              return;
           }
-      } else {
-          downloadImage(activeImage.resizedUrl, activeImage.file.name, activeImage.settings.format);
       }
+      
+      downloadImage(imageUrl, activeImage.file.name, activeImage.settings.format);
+      
   }, [activeImage, toast]);
 
   return (
@@ -164,7 +189,7 @@ export default function ImageResizer() {
             <ResizingControls 
               image={activeImage} 
               onSettingsChange={handleSettingsChange}
-              onResize={handleResize}
+              onResize={() => activeImage && handleResize(activeImage)}
               onDownload={handleDownload}
             />
           </div>

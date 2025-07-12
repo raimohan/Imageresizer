@@ -11,6 +11,7 @@ export type ImageFile = {
     percentage: number;
     format: 'JPEG' | 'PNG' | 'WebP';
     quality: number;
+    targetSize?: number; // in KB
   };
   resizedUrl: string | null;
   resizedSize: number | null;
