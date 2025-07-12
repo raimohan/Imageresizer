@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
@@ -94,6 +95,7 @@ export default function ImageResizer() {
                 percentage: 100,
                 format: 'JPEG',
                 quality: 0.8,
+                targetSize: undefined,
               },
               resizedUrl: null,
               resizedSize: null,
@@ -109,36 +111,42 @@ export default function ImageResizer() {
     });
 
     Promise.all(promises).then(() => {
-      setImages(prev => [...prev, ...newImages]);
+      const newImagesList = [...images, ...newImages];
+      setImages(newImagesList);
       if (activeIndex === null) {
         setActiveIndex(0);
       }
     });
-  }, [activeIndex]);
+  }, [activeIndex, images]);
 
   const handleSelectImage = useCallback((index: number) => {
     setActiveIndex(index);
   }, []);
+  
+  const handleClosePreview = useCallback(() => {
+    setActiveIndex(null);
+  }, []);
+
 
   const handleSettingsChange = useCallback((newSettings: Partial<ImageFile['settings']>) => {
     if (activeIndex === null) return;
 
     setImages(prevImages => {
       const updatedImages = [...prevImages];
-      const activeImage = updatedImages[activeIndex];
-      const oldSettings = activeImage.settings;
+      const currentImage = updatedImages[activeIndex];
+      const oldSettings = currentImage.settings;
 
       const mergedSettings = { ...oldSettings, ...newSettings };
       
-      const aspectRatio = activeImage.originalWidth / activeImage.originalHeight;
+      const aspectRatio = currentImage.originalWidth / currentImage.originalHeight;
 
       if(newSettings.width && oldSettings.width !== newSettings.width && mergedSettings.isLocked) {
         mergedSettings.height = Math.round(newSettings.width / aspectRatio);
       } else if (newSettings.height && oldSettings.height !== newSettings.height && mergedSettings.isLocked) {
         mergedSettings.width = Math.round(newSettings.height * aspectRatio);
       } else if(newSettings.percentage && oldSettings.percentage !== newSettings.percentage) {
-        mergedSettings.width = Math.round(activeImage.originalWidth * (newSettings.percentage / 100));
-        mergedSettings.height = Math.round(activeImage.originalHeight * (newSettings.percentage / 100));
+        mergedSettings.width = Math.round(currentImage.originalWidth * (newSettings.percentage / 100));
+        mergedSettings.height = Math.round(currentImage.originalHeight * (newSettings.percentage / 100));
       } else if (newSettings.isLocked !== undefined) {
          if (mergedSettings.isLocked) {
            mergedSettings.height = Math.round(mergedSettings.width / aspectRatio);
@@ -146,22 +154,29 @@ export default function ImageResizer() {
       }
 
       if (mergedSettings.width !== oldSettings.width || mergedSettings.height !== oldSettings.height) {
-        const percentage = Math.round((mergedSettings.width / activeImage.originalWidth) * 100);
-        mergedSettings.percentage = isNaN(percentage) ? 100 : percentage;
+        if(mergedSettings.width > 0) {
+            const percentage = Math.round((mergedSettings.width / currentImage.originalWidth) * 100);
+            mergedSettings.percentage = isNaN(percentage) ? 100 : percentage;
+        } else {
+            mergedSettings.percentage = 100;
+        }
       }
 
       if (newSettings.targetSize && oldSettings.targetSize !== newSettings.targetSize) {
-        const originalSizeKB = activeImage.file.size / 1024;
-        const sizeRatio = Math.sqrt(newSettings.targetSize / originalSizeKB);
-        if (sizeRatio > 0 && sizeRatio < Infinity) {
-          mergedSettings.width = Math.round(activeImage.originalWidth * sizeRatio);
-          mergedSettings.height = Math.round(activeImage.originalHeight * sizeRatio);
-          mergedSettings.percentage = Math.round(sizeRatio * 100);
+        const originalSizeKB = currentImage.file.size / 1024;
+        const targetSizeKB = newSettings.targetSize;
+        if(targetSizeKB > 0 && originalSizeKB > 0) {
+            const sizeRatio = Math.sqrt(targetSizeKB / originalSizeKB);
+             if (sizeRatio > 0 && sizeRatio < Infinity) {
+                mergedSettings.width = Math.round(currentImage.originalWidth * sizeRatio);
+                mergedSettings.height = Math.round(currentImage.originalHeight * sizeRatio);
+                mergedSettings.percentage = Math.round(sizeRatio * 100);
+            }
         }
       }
       
       updatedImages[activeIndex] = {
-        ...activeImage,
+        ...currentImage,
         settings: mergedSettings,
         resizedUrl: null,
         resizedSize: null,
@@ -204,13 +219,22 @@ export default function ImageResizer() {
       let imageName = activeImage.file.name;
       let imageFormat = activeImage.settings.format;
 
-      // If the image hasn't been resized yet, resize it first.
       if (!imageUrl) {
           try {
               setImages(prev => prev.map(img => img.id === activeImage.id ? { ...img, isResizing: true } : img));
               const { url, size } = await resizeImage(activeImage);
-              setImages(prev => prev.map(img => img.id === activeImage.id ? { ...img, resizedUrl: url, resizedSize: size, isResizing: false } : img));
-              imageUrl = url;
+              setImages(prev => {
+                const newImages = [...prev];
+                const imageIndex = newImages.findIndex(img => img.id === activeImage.id);
+                if (imageIndex > -1) {
+                  newImages[imageIndex] = { ...newImages[imageIndex], resizedUrl: url, resizedSize: size, isResizing: false };
+                  imageUrl = url;
+                }
+                return newImages;
+              });
+
+              if (!imageUrl) throw new Error("Resize did not return a URL");
+              
           } catch (error) {
               console.error("Resizing for download failed:", error);
               setImages(prev => prev.map(img => img.id === activeImage.id ? { ...img, isResizing: false } : img));
@@ -232,11 +256,11 @@ export default function ImageResizer() {
       <AppHeader />
         <div className="gap-1 px-6 flex flex-1 justify-center py-5">
             <main className="layout-content-container flex flex-col max-w-[920px] flex-1">
-                {!activeImage ? (
-                    <UploadArea onFilesAdded={handleFilesAdded} />
-                ) : (
+                <UploadArea onFilesAdded={handleFilesAdded} />
+                
+                {activeImage ? (
                     <>
-                        <ImagePreview activeImage={activeImage} />
+                        <ImagePreview activeImage={activeImage} onClose={handleClosePreview} />
                         <ResizingControls 
                             image={activeImage} 
                             onSettingsChange={handleSettingsChange}
@@ -244,7 +268,12 @@ export default function ImageResizer() {
                             onDownload={handleDownload}
                         />
                     </>
+                ) : images.length > 0 && (
+                  <div className="text-center text-muted-foreground p-8">
+                    <p>Select an image from the queue to start editing.</p>
+                  </div>
                 )}
+
                  <ImageQueue 
                     images={images}
                     activeIndex={activeIndex}
