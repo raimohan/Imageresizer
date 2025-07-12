@@ -81,17 +81,14 @@ export default function ResizingControls({ image, onSettingsChange, onResize, on
              <AccordionItem value="item-3">
               <AccordionTrigger>By Target Size</AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
-                 <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <Label>Target Size (approx. KB)</Label>
-                      <span className="text-sm font-medium text-primary">{settings?.targetSize || Math.round((image?.file?.size || 0) / 1024)} KB</span>
-                    </div>
-                    <Slider 
-                      value={[settings?.targetSize || Math.round((image?.file?.size || 0) / 1024)]} 
-                      min={10} 
-                      max={Math.round((image?.file?.size || 10240) / 1024)} 
-                      step={10} 
-                      onValueChange={([val]) => handleSettings('targetSize', val)} 
+                 <div className="space-y-2">
+                    <Label htmlFor="targetSize">Target Size (approx. KB)</Label>
+                    <Input 
+                      id="targetSize"
+                      type="number"
+                      value={settings?.targetSize || Math.round((image?.file?.size || 0) / 1024)} 
+                      onChange={e => handleSettings('targetSize', parseInt(e.target.value, 10) || 0)}
+                      className="w-full"
                     />
                     <p className="text-xs text-muted-foreground mt-2">Note: Actual size may vary based on image content.</p>
                   </div>
