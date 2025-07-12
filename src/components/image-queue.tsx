@@ -13,7 +13,7 @@ interface ImageQueueProps {
 export default function ImageQueue({ images, activeIndex, onSelectImage }: ImageQueueProps) {
   
   return (
-    <div className="flex flex-col w-[360px]">
+    <div className="flex flex-col w-full">
         <h3 className="text-[#121217] text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Queue ({images.length})</h3>
         <div className='overflow-y-auto'>
             {images.length === 0 && (

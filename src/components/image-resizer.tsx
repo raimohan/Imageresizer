@@ -8,10 +8,10 @@ import ImageQueue from '@/components/image-queue';
 import { Button } from '@/components/ui/button';
 import { resizeImage, downloadImage } from '@/lib/image-utils';
 import { useToast } from '@/hooks/use-toast';
-import { Sun, UploadCloud } from 'lucide-react';
+import { Sun } from 'lucide-react';
 
 const AppHeader = () => (
-    <header className="flex items-center justify-between whitespace-nowrap border-b px-10 py-3">
+    <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#f0f1f4] px-10 py-3">
         <div className="flex items-center gap-4 text-[#121217]">
             <div className="size-4">
                 <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path></svg>
@@ -94,7 +94,6 @@ export default function ImageResizer() {
                 percentage: 100,
                 format: 'JPEG',
                 quality: 0.8,
-                targetSize: Math.round(file.size / 1024),
               },
               resizedUrl: null,
               resizedSize: null,
@@ -202,14 +201,19 @@ export default function ImageResizer() {
       if (!activeImage) return;
       
       let imageUrl = activeImage.resizedUrl;
+      let imageName = activeImage.file.name;
+      let imageFormat = activeImage.settings.format;
 
+      // If the image hasn't been resized yet, resize it first.
       if (!imageUrl) {
           try {
+              setImages(prev => prev.map(img => img.id === activeImage.id ? { ...img, isResizing: true } : img));
               const { url, size } = await resizeImage(activeImage);
               setImages(prev => prev.map(img => img.id === activeImage.id ? { ...img, resizedUrl: url, resizedSize: size, isResizing: false } : img));
               imageUrl = url;
           } catch (error) {
               console.error("Resizing for download failed:", error);
+              setImages(prev => prev.map(img => img.id === activeImage.id ? { ...img, isResizing: false } : img));
               toast({
                   variant: "destructive",
                   title: "Resize Failed",
@@ -219,7 +223,7 @@ export default function ImageResizer() {
           }
       }
       
-      downloadImage(imageUrl, activeImage.file.name, activeImage.settings.format);
+      downloadImage(imageUrl, imageName, imageFormat);
       
   }, [activeImage, toast]);
 
@@ -241,14 +245,12 @@ export default function ImageResizer() {
                         />
                     </>
                 )}
-            </main>
-            <aside>
-                <ImageQueue 
+                 <ImageQueue 
                     images={images}
                     activeIndex={activeIndex}
                     onSelectImage={handleSelectImage}
                 />
-            </aside>
+            </main>
         </div>
     </div>
   );
