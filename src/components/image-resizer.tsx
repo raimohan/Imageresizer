@@ -111,21 +111,36 @@ export default function ImageResizer() {
     });
 
     Promise.all(promises).then(() => {
-      const newImagesList = [...images, ...newImages];
-      setImages(newImagesList);
-      if (activeIndex === null) {
-        setActiveIndex(0);
-      }
+      setImages(prevImages => {
+        const newImagesList = [...prevImages, ...newImages];
+        if (activeIndex === null && newImagesList.length > 0) {
+          setActiveIndex(0);
+        }
+        return newImagesList;
+      });
     });
-  }, [activeIndex, images]);
+  }, [activeIndex]);
 
   const handleSelectImage = useCallback((index: number) => {
     setActiveIndex(index);
   }, []);
   
   const handleClosePreview = useCallback(() => {
-    setActiveIndex(null);
-  }, []);
+    if (activeIndex === null) return;
+
+    setImages(prevImages => {
+      const newImages = [...prevImages];
+      newImages.splice(activeIndex, 1);
+      
+      if (newImages.length === 0) {
+        setActiveIndex(null);
+      } else if (activeIndex >= newImages.length) {
+        setActiveIndex(newImages.length - 1);
+      }
+      
+      return newImages;
+    });
+  }, [activeIndex]);
 
 
   const handleSettingsChange = useCallback((newSettings: Partial<ImageFile['settings']>) => {
@@ -223,13 +238,16 @@ export default function ImageResizer() {
           try {
               setImages(prev => prev.map(img => img.id === activeImage.id ? { ...img, isResizing: true } : img));
               const { url, size } = await resizeImage(activeImage);
+              
+              let finalUrl = url;
+              
               setImages(prev => {
                 const newImages = [...prev];
                 const imageIndex = newImages.findIndex(img => img.id === activeImage.id);
                 if (imageIndex > -1) {
                   newImages[imageIndex] = { ...newImages[imageIndex], resizedUrl: url, resizedSize: size, isResizing: false };
-                  imageUrl = url;
                 }
+                imageUrl = url;
                 return newImages;
               });
 
@@ -273,7 +291,6 @@ export default function ImageResizer() {
                     <p>Select an image from the queue to start editing.</p>
                   </div>
                 )}
-
                  <ImageQueue 
                     images={images}
                     activeIndex={activeIndex}
