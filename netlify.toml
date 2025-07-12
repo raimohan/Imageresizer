@@ -1,8 +1,10 @@
 [build]
-  command = ""
-  publish = "."
+  command = ""            # No build step since it's a static site
+  publish = "."           # Publish current directory
 
 [[plugins]]
-  package = "@netlify/plugin-nextjs"
-  condition = "false"
+  package = "netlify-plugin-one"   # Dummy plugin, won't affect anything
+
+  [plugins.inputs]
+  port = 80              # Dummy input just for syntax validation
   
