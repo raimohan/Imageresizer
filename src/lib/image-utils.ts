@@ -47,29 +47,26 @@ export function resizeImage(imageFile: ImageFile): Promise<ResizeResult> {
             img.onload = async () => {
                 try {
                     // If a target size is specified, try to meet it
-                    if (settings.targetSize && settings.format === 'JPEG') {
+                    if (settings.targetSize && settings.targetSize > 0 && settings.format === 'JPEG') {
                         const targetBytes = settings.targetSize * 1024;
                         let minQuality = 0;
                         let maxQuality = 1;
                         let bestBlob: Blob | null = null;
 
                         // Iteratively find the best quality setting
-                        for (let i = 0; i < 7; i++) {
+                        for (let i = 0; i < 7; i++) { // 7 iterations are usually enough for good precision
                             const quality = (minQuality + maxQuality) / 2;
                             const currentSettings = { ...settings, quality };
                             const blob = await performResize(img, currentSettings);
 
-                            if (!bestBlob || (blob.size <= targetBytes && blob.size > bestBlob.size)) {
-                                bestBlob = blob;
-                            }
-                            
-                            if (blob.size === targetBytes) {
-                                bestBlob = blob;
-                                break;
-                            } else if (blob.size > targetBytes) {
-                                maxQuality = quality;
+                            // We want the largest blob that is still smaller than the target
+                            if (blob.size <= targetBytes) {
+                                if (!bestBlob || blob.size > bestBlob.size) {
+                                    bestBlob = blob;
+                                }
+                                minQuality = quality; // try for higher quality
                             } else {
-                                minQuality = quality;
+                                maxQuality = quality; // too big, reduce quality
                             }
                         }
 
@@ -77,8 +74,8 @@ export function resizeImage(imageFile: ImageFile): Promise<ResizeResult> {
                             const url = URL.createObjectURL(bestBlob);
                             resolve({ url, size: bestBlob.size });
                         } else {
-                             // Fallback to a default quality if no suitable blob was found
-                            const blob = await performResize(img, { ...settings, quality: 0.7 });
+                             // Fallback to a default quality if no suitable blob was found (e.g., target size is too small)
+                            const blob = await performResize(img, { ...settings, quality: 0.1 });
                             const url = URL.createObjectURL(blob);
                             resolve({ url, size: blob.size });
                         }
