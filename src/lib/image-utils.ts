@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ImageFile } from '@/types';
@@ -7,40 +8,94 @@ type ResizeResult = {
     size: number;
 }
 
+// Helper to perform a single resize operation
+function performResize(img: HTMLImageElement, settings: ImageFile['settings']): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+        const { width, height, format, quality } = settings;
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            return reject(new Error('Could not get canvas context'));
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+            (blob) => {
+                if (!blob) {
+                    return reject(new Error('Canvas to Blob conversion failed'));
+                }
+                resolve(blob);
+            },
+            `image/${format.toLowerCase()}`,
+            quality
+        );
+    });
+}
+
 export function resizeImage(imageFile: ImageFile): Promise<ResizeResult> {
     return new Promise((resolve, reject) => {
         const { file, settings } = imageFile;
-        const { width, height, format, quality } = settings;
 
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
             const img = new Image();
             img.src = event.target?.result as string;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) {
-                    return reject(new Error('Could not get canvas context'));
-                }
-                ctx.drawImage(img, 0, 0, width, height);
-                canvas.toBlob(
-                    (blob) => {
-                        if (!blob) {
-                            return reject(new Error('Canvas to Blob conversion failed'));
+
+            img.onload = async () => {
+                try {
+                    // If a target size is specified, try to meet it
+                    if (settings.targetSize && settings.format === 'JPEG') {
+                        const targetBytes = settings.targetSize * 1024;
+                        let minQuality = 0;
+                        let maxQuality = 1;
+                        let bestBlob: Blob | null = null;
+
+                        // Iteratively find the best quality setting
+                        for (let i = 0; i < 7; i++) {
+                            const quality = (minQuality + maxQuality) / 2;
+                            const currentSettings = { ...settings, quality };
+                            const blob = await performResize(img, currentSettings);
+
+                            if (!bestBlob || (blob.size <= targetBytes && blob.size > bestBlob.size)) {
+                                bestBlob = blob;
+                            }
+                            
+                            if (blob.size === targetBytes) {
+                                bestBlob = blob;
+                                break;
+                            } else if (blob.size > targetBytes) {
+                                maxQuality = quality;
+                            } else {
+                                minQuality = quality;
+                            }
                         }
+
+                        if (bestBlob) {
+                            const url = URL.createObjectURL(bestBlob);
+                            resolve({ url, size: bestBlob.size });
+                        } else {
+                             // Fallback to a default quality if no suitable blob was found
+                            const blob = await performResize(img, { ...settings, quality: 0.7 });
+                            const url = URL.createObjectURL(blob);
+                            resolve({ url, size: blob.size });
+                        }
+
+                    } else {
+                        // Standard resize if no target size or not JPEG
+                        const blob = await performResize(img, settings);
                         const url = URL.createObjectURL(blob);
                         resolve({ url, size: blob.size });
-                    },
-                    `image/${format.toLowerCase()}`,
-                    quality
-                );
+                    }
+                } catch (err) {
+                    reject(err);
+                }
             };
-            img.onerror = reject;
+            img.onerror = () => reject(new Error("Image failed to load for resizing."));
         };
-        reader.onerror = reject;
+        reader.onerror = () => reject(new Error("File reader failed during resize process."));
     });
 }
 
@@ -55,5 +110,6 @@ export function downloadImage(url: string, originalFilename: string, format: 'JP
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    // Don't revoke URL immediately, allow time for download to start
+    setTimeout(() => URL.revokeObjectURL(url), 100);
 }

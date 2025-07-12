@@ -31,6 +31,7 @@ const UploadArea = ({ onFilesAdded }: { onFilesAdded: (files: File[]) => void })
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files) {
             onFilesAdded(Array.from(event.target.files));
+            event.target.value = ''; // Reset for re-uploading the same file
         }
     };
 
@@ -77,7 +78,12 @@ export default function ImageResizer() {
   const handleFilesAdded = useCallback((files: File[]) => {
     const newImages: ImageFile[] = [];
     const promises = Array.from(files).map(file => {
-      return new Promise<void>(resolve => {
+      return new Promise<void>((resolve, reject) => {
+        if (!file.type.startsWith('image/')) {
+            console.warn(`File ${file.name} is not an image, skipping.`);
+            resolve();
+            return;
+        }
         const reader = new FileReader();
         reader.onload = (e) => {
           const img = new Image();
@@ -94,7 +100,7 @@ export default function ImageResizer() {
                 isLocked: true,
                 percentage: 100,
                 format: 'JPEG',
-                quality: 0.8,
+                quality: 0.9,
                 targetSize: undefined,
               },
               resizedUrl: null,
@@ -104,8 +110,10 @@ export default function ImageResizer() {
             newImages.push(newImage);
             resolve();
           };
+          img.onerror = () => reject(new Error('Image failed to load'));
           img.src = e.target?.result as string;
         };
+        reader.onerror = () => reject(new Error('File reader failed'));
         reader.readAsDataURL(file);
       });
     });
@@ -115,11 +123,23 @@ export default function ImageResizer() {
         const newImagesList = [...prevImages, ...newImages];
         if (activeIndex === null && newImagesList.length > 0) {
           setActiveIndex(0);
+        } else if (activeIndex !== null) {
+          // keep current active index if it exists
+        } else if (newImagesList.length > 0) {
+          setActiveIndex(newImagesList.length -1);
         }
+
         return newImagesList;
       });
+    }).catch(err => {
+        console.error("Error adding files:", err);
+        toast({
+            variant: "destructive",
+            title: "File Error",
+            description: "There was an error loading one of the images."
+        });
     });
-  }, [activeIndex]);
+  }, [activeIndex, toast]);
 
   const handleSelectImage = useCallback((index: number) => {
     setActiveIndex(index);
@@ -154,46 +174,40 @@ export default function ImageResizer() {
       const mergedSettings = { ...oldSettings, ...newSettings };
       
       const aspectRatio = currentImage.originalWidth / currentImage.originalHeight;
+      
+      // Clear target size if other dimension-affecting properties are changed
+      if (newSettings.width || newSettings.height || newSettings.percentage) {
+        mergedSettings.targetSize = undefined;
+      }
 
-      if(newSettings.width && oldSettings.width !== newSettings.width && mergedSettings.isLocked) {
-        mergedSettings.height = Math.round(newSettings.width / aspectRatio);
-      } else if (newSettings.height && oldSettings.height !== newSettings.height && mergedSettings.isLocked) {
-        mergedSettings.width = Math.round(newSettings.height * aspectRatio);
+      if (newSettings.width && oldSettings.width !== newSettings.width) {
+        if (mergedSettings.isLocked) {
+            mergedSettings.height = Math.round(newSettings.width / aspectRatio);
+        }
+      } else if (newSettings.height && oldSettings.height !== newSettings.height) {
+        if (mergedSettings.isLocked) {
+            mergedSettings.width = Math.round(newSettings.height * aspectRatio);
+        }
       } else if(newSettings.percentage && oldSettings.percentage !== newSettings.percentage) {
         mergedSettings.width = Math.round(currentImage.originalWidth * (newSettings.percentage / 100));
         mergedSettings.height = Math.round(currentImage.originalHeight * (newSettings.percentage / 100));
-      } else if (newSettings.isLocked !== undefined) {
-         if (mergedSettings.isLocked) {
-           mergedSettings.height = Math.round(mergedSettings.width / aspectRatio);
-         }
+      } else if (newSettings.isLocked !== undefined && newSettings.isLocked) {
+         mergedSettings.height = Math.round(mergedSettings.width / aspectRatio);
       }
 
       if (mergedSettings.width !== oldSettings.width || mergedSettings.height !== oldSettings.height) {
-        if(mergedSettings.width > 0) {
-            const percentage = Math.round((mergedSettings.width / currentImage.originalWidth) * 100);
-            mergedSettings.percentage = isNaN(percentage) ? 100 : percentage;
-        } else {
-            mergedSettings.percentage = 100;
-        }
-      }
-
-      if (newSettings.targetSize && oldSettings.targetSize !== newSettings.targetSize) {
-        const originalSizeKB = currentImage.file.size / 1024;
-        const targetSizeKB = newSettings.targetSize;
-        if(targetSizeKB > 0 && originalSizeKB > 0) {
-            const sizeRatio = Math.sqrt(targetSizeKB / originalSizeKB);
-             if (sizeRatio > 0 && sizeRatio < Infinity) {
-                mergedSettings.width = Math.round(currentImage.originalWidth * sizeRatio);
-                mergedSettings.height = Math.round(currentImage.originalHeight * sizeRatio);
-                mergedSettings.percentage = Math.round(sizeRatio * 100);
-            }
-        }
+          if(mergedSettings.width > 0) {
+              const percentage = Math.round((mergedSettings.width / currentImage.originalWidth) * 100);
+              mergedSettings.percentage = isNaN(percentage) ? 100 : percentage;
+          } else {
+              mergedSettings.percentage = 100;
+          }
       }
       
       updatedImages[activeIndex] = {
         ...currentImage,
         settings: mergedSettings,
-        resizedUrl: null,
+        resizedUrl: null, // Invalidate previous resize on setting change
         resizedSize: null,
       };
 
@@ -234,12 +248,11 @@ export default function ImageResizer() {
       let imageName = activeImage.file.name;
       let imageFormat = activeImage.settings.format;
 
+      // If there's no resized image URL, we need to resize first
       if (!imageUrl) {
           try {
               setImages(prev => prev.map(img => img.id === activeImage.id ? { ...img, isResizing: true } : img));
               const { url, size } = await resizeImage(activeImage);
-              
-              let finalUrl = url;
               
               setImages(prev => {
                 const newImages = [...prev];
@@ -247,7 +260,7 @@ export default function ImageResizer() {
                 if (imageIndex > -1) {
                   newImages[imageIndex] = { ...newImages[imageIndex], resizedUrl: url, resizedSize: size, isResizing: false };
                 }
-                imageUrl = url;
+                imageUrl = url; // assign for download
                 return newImages;
               });
 
