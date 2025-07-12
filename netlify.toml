@@ -1,12 +1,11 @@
-[build]
-  command = "npm run build"
-  commandOrigin = "config"
-  publish = "out"
-  publishOrigin = "config"
-
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
-  origin = "config"
-  [plugins.inputs]
-    skip = true
+build:
+  command: npm run build
+  commandOrigin: config
+  publish: /opt/build/repo/out
+  publishOrigin: config
+plugins:
+  - inputs:
+      skip: true
+    origin: config
+    package: "@netlify/plugin-nextjs"
     
