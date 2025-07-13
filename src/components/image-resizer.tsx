@@ -10,12 +10,12 @@ import { Button } from '@/components/ui/button';
 import { resizeImage, downloadImage } from '@/lib/image-utils';
 import { useToast } from '@/hooks/use-toast';
 import { Sun } from 'lucide-react';
-import Image from 'next/image';
+import NextImage from 'next/image';
 
 const AppHeader = () => (
     <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#f0f1f4] px-10 py-3">
         <div className="flex items-center gap-2 text-[#121217]">
-            <Image src="https://iili.io/FM85HeS.png" alt="Shrinkray Logo" width={32} height={32} />
+            <NextImage src="https://iili.io/FM85HeS.png" alt="Shrinkray Logo" width={32} height={32} />
             <h2 className="text-[#121217] text-lg font-bold leading-tight tracking-[-0.015em]">Image Resizer</h2>
         </div>
         <button
@@ -312,4 +312,4 @@ export default function ImageResizer() {
         </div>
     </div>
   );
-      }
+            }
