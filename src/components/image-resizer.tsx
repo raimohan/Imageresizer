@@ -10,13 +10,12 @@ import { Button } from '@/components/ui/button';
 import { resizeImage, downloadImage } from '@/lib/image-utils';
 import { useToast } from '@/hooks/use-toast';
 import { Sun } from 'lucide-react';
+import Image from 'next/image';
 
 const AppHeader = () => (
     <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#f0f1f4] px-10 py-3">
-        <div className="flex items-center gap-4 text-[#121217]">
-            <div className="size-4">
-                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path></svg>
-            </div>
+        <div className="flex items-center gap-2 text-[#121217]">
+            <Image src="https://iili.io/FM85HeS.png" alt="Shrinkray Logo" width={32} height={32} />
             <h2 className="text-[#121217] text-lg font-bold leading-tight tracking-[-0.015em]">Image Resizer</h2>
         </div>
         <button
@@ -313,4 +312,4 @@ export default function ImageResizer() {
         </div>
     </div>
   );
-}
+      }
