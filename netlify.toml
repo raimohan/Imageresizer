@@ -1,12 +1,6 @@
 [build]
   command = "npm run build"
-  commandOrigin = "config"
   publish = "out"
-  publishOrigin = "config"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
-  origin = "config"
-  [plugins.inputs]
-    skip = true
-    
